@@ -1,0 +1,56 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tests (Apps Script logic, full-stack API flow, migration)
+        run: npm test
+      - name: Type-check and build
+        run: npm run build
+      - name: Write public runtime config
+        env:
+          GAS_URL: ${{ vars.GAS_URL }}
+        run: |
+          # GAS_URL is a repository *variable* (not a secret): the web-app address is public by nature.
+          if [ -n "$GAS_URL" ]; then
+            if [[ ! "$GAS_URL" =~ ^https://script\.google\.com/macros/s/[A-Za-z0-9_-]+/exec$ ]]; then
+              echo "GAS_URL does not look like an Apps Script /exec URL"; exit 1
+            fi
+            printf 'window.EFBMS_CONFIG = { gasUrl: "%s" };\n' "$GAS_URL" > dist/config.js
+          else
+            echo "::warning::Repository variable GAS_URL is not set — the site will show 'Backend is not connected yet'."
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

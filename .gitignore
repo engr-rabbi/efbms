@@ -1,0 +1,13 @@
+node_modules/
+dist/
+gas-dist/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+# never commit exports of real customer data or any credential
+efbms-export*.json
+*.pem
+*service-account*.json
+client_secret*.json
